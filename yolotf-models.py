@@ -159,7 +159,90 @@ def make_yolov3_tiny_model():
   model = Model(input_image, [yolo_16, yolo_22])
   return model
 
+def make_yolov3_spp_model():
+	input_image = Input(shape=(None, None, 3))
+	# Layer  0 => 4
+	x = _conv_block(input_image, [{'filter': 32, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 0},
+								  {'filter': 64, 'kernel': 3, 'stride': 2, 'bnorm': True, 'leaky': True, 'layer_idx': 1},
+								  {'filter': 32, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 2},
+								  {'filter': 64, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 3}], skip=True)
+	# Layer  5 => 8
+	x = _conv_block(x, [{'filter': 128, 'kernel': 3, 'stride': 2, 'bnorm': True, 'leaky': True, 'layer_idx': 5},
+						{'filter':  64, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 6},
+						{'filter': 128, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 7}], skip=True)
+	# Layer  9 => 11
+	x = _conv_block(x, [{'filter':  64, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 9},
+						{'filter': 128, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 10}], skip=True)
+	# Layer 12 => 15
+	x = _conv_block(x, [{'filter': 256, 'kernel': 3, 'stride': 2, 'bnorm': True, 'leaky': True, 'layer_idx': 12},
+						{'filter': 128, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 13},
+						{'filter': 256, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 14}], skip=True)
+	# Layer 16 => 36
+	for i in range(7):
+		x = _conv_block(x, [{'filter': 128, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 16+i*3},
+							{'filter': 256, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 17+i*3}], skip=True)
+	skip_36 = x
+	# Layer 37 => 40
+	x = _conv_block(x, [{'filter': 512, 'kernel': 3, 'stride': 2, 'bnorm': True, 'leaky': True, 'layer_idx': 37},
+						{'filter': 256, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 38},
+						{'filter': 512, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 39}], skip=True)
+	# Layer 41 => 61
+	for i in range(7):
+		x = _conv_block(x, [{'filter': 256, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 41+i*3},
+							{'filter': 512, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 42+i*3}], skip=True)
+	skip_61 = x
+	# Layer 62 => 65
+	x = _conv_block(x, [{'filter': 1024, 'kernel': 3, 'stride': 2, 'bnorm': True, 'leaky': True, 'layer_idx': 62},
+						{'filter':  512, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 63},
+						{'filter': 1024, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 64}], skip=True)
+	# Layer 66 => 74
+	for i in range(3):
+		x = _conv_block(x, [{'filter':  512, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 66+i*3},
+							{'filter': 1024, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 67+i*3}], skip=True)
+	# Layer 75 => 79
+	x = _conv_block(x, [{'filter':  512, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 75},
+						{'filter': 1024, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 76},
+						{'filter':  512, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 77}], skip=False)
 
+	x = concatenate([MaxPooling2D(pool_size=(13,13),strides=1,padding='same')(x),
+	         MaxPooling2D(pool_size=(9,9),strides=1,padding='same')(x),
+	         MaxPooling2D(pool_size=(5,5),strides=1,padding='same')(x),
+					     x])
+
+	# Layer 80 => 83
+	x = _conv_block(x, [{'filter':  512, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 80},
+  					{'filter': 1024, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 81},
+						{'filter':  512, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 82}], skip=False)
+	# Layer 84 => 86
+	yolo_86 = _conv_block(x, [{'filter': 1024, 'kernel': 3, 'stride': 1, 'bnorm': True,  'leaky': True,  'layer_idx': 84},
+							  {'filter':  255, 'kernel': 1, 'stride': 1, 'bnorm': False, 'leaky': False, 'layer_idx': 85}], skip=False)
+	# Layer 87 => 90
+	x = _conv_block(x, [{'filter': 256, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 87}], skip=False)
+	x = UpSampling2D(2)(x)
+	x = concatenate([x, skip_61])
+	# Layer 91 => 96
+	x = _conv_block(x, [{'filter': 256, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 91},
+						{'filter': 512, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 92},
+						{'filter': 256, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 93},
+						{'filter': 512, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 94},
+						{'filter': 256, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 95}], skip=False)
+	# Layer 97 => 99
+	yolo_99 = _conv_block(x, [{'filter': 512, 'kernel': 3, 'stride': 1, 'bnorm': True,  'leaky': True,  'layer_idx': 97},
+							  {'filter': 255, 'kernel': 1, 'stride': 1, 'bnorm': False, 'leaky': False, 'layer_idx': 98}], skip=False)
+	# Layer 100 => 103
+	x = _conv_block(x, [{'filter': 128, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True,   'layer_idx': 100}], skip=False)
+	x = UpSampling2D(2)(x)
+	x = concatenate([x, skip_36])
+	# Layer 104 => 111
+	yolo_111 = _conv_block(x, [{'filter': 128, 'kernel': 1, 'stride': 1, 'bnorm': True,  'leaky': True,  'layer_idx': 104},
+							   {'filter': 256, 'kernel': 3, 'stride': 1, 'bnorm': True,  'leaky': True,  'layer_idx': 105},
+							   {'filter': 128, 'kernel': 1, 'stride': 1, 'bnorm': True,  'leaky': True,  'layer_idx': 106},
+							   {'filter': 256, 'kernel': 3, 'stride': 1, 'bnorm': True,  'leaky': True,  'layer_idx': 107},
+							   {'filter': 128, 'kernel': 1, 'stride': 1, 'bnorm': True,  'leaky': True,  'layer_idx': 108},
+							   {'filter': 256, 'kernel': 3, 'stride': 1, 'bnorm': True,  'leaky': True,  'layer_idx': 109},
+							   {'filter': 255, 'kernel': 1, 'stride': 1, 'bnorm': False, 'leaky': False, 'layer_idx': 110}], skip=False)
+	model = Model(input_image, [yolo_86, yolo_99, yolo_111])
+	return model
 
 
 ### Weight Reader to convert to load weights to tensorflow models ###### 
@@ -182,13 +265,66 @@ class WeightReader:
 		self.offset = self.offset + size
 		return self.all_weights[self.offset-size:self.offset]
 
-	def load_weights(self, model):
+	def load_weights_yolov3(self, model):
+		for i in range(106):
+			try:
+				conv_layer = model.get_layer('conv_' + str(i))
+				print("loading weights of convolution #" + str(i))
+				if i not in [81, 93, 105]:
+					norm_layer = model.get_layer('bnorm_' + str(i))
+					size = np.prod(norm_layer.get_weights()[0].shape)
+					beta  = self.read_bytes(size) # bias
+					gamma = self.read_bytes(size) # scale
+					mean  = self.read_bytes(size) # mean
+					var   = self.read_bytes(size) # variance
+					weights = norm_layer.set_weights([gamma, beta, mean, var])
+				if len(conv_layer.get_weights()) > 1:
+					bias   = self.read_bytes(np.prod(conv_layer.get_weights()[1].shape))
+					kernel = self.read_bytes(np.prod(conv_layer.get_weights()[0].shape))
+					kernel = kernel.reshape(list(reversed(conv_layer.get_weights()[0].shape)))
+					kernel = kernel.transpose([2,3,1,0])
+					conv_layer.set_weights([kernel, bias])
+				else:
+					kernel = self.read_bytes(np.prod(conv_layer.get_weights()[0].shape))
+					kernel = kernel.reshape(list(reversed(conv_layer.get_weights()[0].shape)))
+					kernel = kernel.transpose([2,3,1,0])
+					conv_layer.set_weights([kernel])
+			except ValueError:
+				print("no convolution #" + str(i))
+
+	def load_weights_yolov3_tiny(self, model):
 		for i in range(22):
 			try:
 				conv_layer = model.get_layer('conv_' + str(i))
 				print("loading weights of convolution #" + str(i))
-				if i not in [15, 21]:   # skip the final detection layers for yolov3-tiny
-				if i not in [81, 93, 105]: # skip the final detection layers for yolov3
+				if i not in [15, 21]:
+					norm_layer = model.get_layer('bnorm_' + str(i))
+					size = np.prod(norm_layer.get_weights()[0].shape)
+					beta  = self.read_bytes(size) # bias
+					gamma = self.read_bytes(size) # scale
+					mean  = self.read_bytes(size) # mean
+					var   = self.read_bytes(size) # variance
+					weights = norm_layer.set_weights([gamma, beta, mean, var])
+				if len(conv_layer.get_weights()) > 1:
+					bias   = self.read_bytes(np.prod(conv_layer.get_weights()[1].shape))
+					kernel = self.read_bytes(np.prod(conv_layer.get_weights()[0].shape))
+					kernel = kernel.reshape(list(reversed(conv_layer.get_weights()[0].shape)))
+					kernel = kernel.transpose([2,3,1,0])
+					conv_layer.set_weights([kernel, bias])
+				else:
+					kernel = self.read_bytes(np.prod(conv_layer.get_weights()[0].shape))
+					kernel = kernel.reshape(list(reversed(conv_layer.get_weights()[0].shape)))
+					kernel = kernel.transpose([2,3,1,0])
+					conv_layer.set_weights([kernel])
+			except ValueError:
+				print("no convolution #" + str(i))
+
+	def load_weights_yolov3_spp(self, model):
+		for i in range(111):
+			try:
+				conv_layer = model.get_layer('conv_' + str(i))
+				print("loading weights of convolution #" + str(i))
+				if i not in [85, 98, 110]:
 					norm_layer = model.get_layer('bnorm_' + str(i))
 					size = np.prod(norm_layer.get_weights()[0].shape)
 					beta  = self.read_bytes(size) # bias
@@ -221,6 +357,6 @@ model = make_yolov3_model()
 # load the model weights
 weight_reader = WeightReader('yolov3.weights')
 # set the model weights into the model
-weight_reader.load_weights(model)
+weight_reader.load_weights_yolov3(model)
 # save the model to file
 model.save('model_yolov3.h5')
